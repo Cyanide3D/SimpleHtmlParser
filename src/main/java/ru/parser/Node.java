@@ -12,11 +12,20 @@ public class Node {
     private int end;
     private Map<String, String> attrs;
     private String content;
+    private Node parent;
     private List<Node> childs;
 
     public Node() {
         this.attrs = new HashMap<>();
         this.childs = new ArrayList<>();
+    }
+
+    public Node getParent() {
+        return parent;
+    }
+
+    public void setParent(Node parent) {
+        this.parent = parent;
     }
 
     public List<Node> getChilds() {
