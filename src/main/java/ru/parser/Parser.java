@@ -1,14 +1,71 @@
 package ru.parser;
 
+import java.lang.management.BufferPoolMXBean;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.PrimitiveIterator;
 
 public class Parser {
 
     public Node parse(String html) {
-        List<Lexeme> lexemes = readLexemesFromHtml(html);
-        return null;
+        LexemeBuffer lexemeBuffer = new LexemeBuffer(readLexemesFromHtml(html));
+        Node node = new Node();
+        tag(node, lexemeBuffer);
+        return node;
+    }
+
+    private void tag(Node node, LexemeBuffer buffer) {
+        if (buffer.hasNext()){
+            Lexeme lexeme = buffer.next();
+            switch (lexeme.getType()) {
+                case LEFT_BRACER -> {
+                    node.setTag(makeStringFromLexeme(buffer));
+                    attrs(node, buffer);
+                    tag(node, buffer);
+                }
+                case RIGHT_BRACER -> {
+                    //TODO
+                }
+
+                case SPACE -> {
+                    skipWhitespaces(buffer);
+                    tag(node, buffer);
+                }
+            }
+        }
+    }
+
+    private void attrs(Node node, LexemeBuffer buffer) {
+
+    }
+
+    private void content(Node node, LexemeBuffer buffer) {
+
+    }
+
+    private String makeStringFromLexeme(LexemeBuffer buffer) {
+        StringBuilder stringBuilder = new StringBuilder();
+        while (buffer.hasNext()) {
+            Lexeme lexeme = buffer.next();
+            if (lexeme.getType().equals(LexemeType.CHARACTER)) {
+                stringBuilder.append(lexeme.getValue());
+            } else {
+                buffer.back();
+                break;
+            }
+        }
+
+        return stringBuilder.toString();
+    }
+
+    private Lexeme skipWhitespaces(LexemeBuffer buffer) { {
+        Lexeme lexeme = buffer.next();
+        while (lexeme.getType().equals(LexemeType.SPACE)) {
+            lexeme = buffer.next();
+        }
+        buffer.back();
+        return lexeme;
+    }
+
     }
 
     private List<Lexeme> readLexemesFromHtml(String html) {
@@ -29,6 +86,7 @@ public class Parser {
             case '=' -> LexemeType.EQUAL;
             case '"' -> LexemeType.QUOTATION_MARK;
             case ' ' -> LexemeType.SPACE;
+            case '/' -> LexemeType.SLASH;
             default -> LexemeType.CHARACTER;
         };
     }

@@ -32,6 +32,10 @@ public class Node {
         return childs;
     }
 
+    public void addAttr(String key, String value) {
+        attrs.put(key, value);
+    }
+
     public void setChilds(List<Node> childs) {
         this.childs = childs;
     }
