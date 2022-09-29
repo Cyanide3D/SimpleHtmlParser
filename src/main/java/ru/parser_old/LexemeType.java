@@ -1,4 +1,4 @@
-package ru.parser;
+package ru.parser_old;
 
 public enum LexemeType {
 
