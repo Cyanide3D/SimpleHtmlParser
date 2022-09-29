@@ -2,6 +2,7 @@ package ru.parser;
 
 import ru.parser.tokenizer.Tokenizer;
 
+import java.io.IOException;
 import java.io.InputStream;
 
 public class Parser {
@@ -11,6 +12,11 @@ public class Parser {
     public Tag parse(InputStream source) {
         tokenizer = new Tokenizer(source);
         return null;
+
+    }
+
+    private void handle(Tag tag) throws IOException {
+
     }
 
 }

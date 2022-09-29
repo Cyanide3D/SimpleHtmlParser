@@ -26,4 +26,44 @@ public class Tag {
     public void addChild(Tag tag) {
         children.add(tag);
     }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public List<Attribute> getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(List<Attribute> attributes) {
+        this.attributes = attributes;
+    }
+
+    public List<Tag> getChildren() {
+        return children;
+    }
+
+    public void setChildren(List<Tag> children) {
+        this.children = children;
+    }
+
+    public List<String> getBody() {
+        return body;
+    }
+
+    public void setBody(List<String> body) {
+        this.body = body;
+    }
+
+    public Tag getParent() {
+        return parent;
+    }
+
+    public void setParent(Tag parent) {
+        this.parent = parent;
+    }
 }
