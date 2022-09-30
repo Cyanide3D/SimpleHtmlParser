@@ -9,10 +9,8 @@ public class Parser {
 
     private Tokenizer tokenizer;
 
-    public Tag parse(InputStream source) {
-        tokenizer = new Tokenizer(source);
+    public Tag parse(InputStream source) throws IOException {
         return null;
-
     }
 
     private void handle(Tag tag) throws IOException {

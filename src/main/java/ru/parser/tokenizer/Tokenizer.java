@@ -9,116 +9,101 @@ import static ru.parser.tokenizer.TokenizerState.*;
 public class Tokenizer {
 
     private TokenizerState state;
-    private String html = "";
-    private final char[] DELIMITERS = {'\t', '\n', '\r', '\f', ' '};
+    private final String DELIMITERS = "\t\n\r\f ";
+    private final InputStream source;
 
-    private int currentPosition = 0;
-    private int maxPosition = 0;
-
-
+    private TokenType prevTokenType;
+    private char lastChat = ' ';
 
     public Tokenizer(InputStream source) {
-        try {
-            this.html = new String(source.readAllBytes());
-            maxPosition = html.length()-1;
-
-            skipDelimiters();
-            if (!html.startsWith("<")) {
-                throw new IllegalArgumentException();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        this.source = source;
     }
-
-
 
 
     public Token getNextToken() throws IOException {
-        skipDelimiters();
-        if (maxPosition-1 <= currentPosition) return null;
-        char c = html.charAt(currentPosition);
+        int bytes = source.read();
+        if (bytes == -1) return null;
+        char c = (char) bytes;
 
-        while (!Character.isAlphabetic(c) && maxPosition > currentPosition) {
-            c = html.charAt(++currentPosition);
+        while (DELIMITERS.indexOf(c) >= 0) {
+            c = (char) source.read();
         }
 
-        Token token = new Token();
-        token.setType(getTokenType());
-        token.setValue(getLetterSequenceAsString(token.getType()));
+        Token token = null;
+        if (c == '<' || prevTokenType == TAG_BODY) {
+            token = tagName((char) source.read());
+        } else if (lastChat == '>' || c == '>') {
+            token = tagBody(c);
+        } else if (Character.isAlphabetic(c) && (prevTokenType == TAG_NAME || prevTokenType == ATTRIBUTE_NAME || prevTokenType == ATTRIBUTE_VALUE)) {
+            token = tagAttrName(c);
+        } else if (c == '"' || c == '=') {
+            token = tagAttrValue(c);
+        } else {
+            throw new UnsupportedOperationException();
+        }
 
+        prevTokenType = token.getType();
         return token;
     }
 
-    private TokenType getTokenType() {
-        for (int i = currentPosition-1; i >= 0; i--) {
-            if (html.charAt(i) == '<') {
-                state = OPEN_TAG;
-                for (int j = i; html.charAt(j) != '>'; j++) {
-                    if (html.charAt(j) == '/') {
-                        state = CLOSE_TAG;
-                        break;
-                    }
-                }
-                return TAG_NAME;
-            } else if (Character.isAlphabetic(html.charAt(i))) {
-                return ATTRIBUTE_NAME;
-            } else if (html.charAt(i) == '"') {
-                return html.charAt(i - 1) == '=' ? ATTRIBUTE_VALUE : ATTRIBUTE_NAME;
-            } else if (html.charAt(i) == '>') {
-                state = BODY;
-                return TAG_BODY;
-            }
+    private Token tagName(char c) throws IOException {
+        while (DELIMITERS.indexOf(c) >= 0 || c == '<') {
+            c = (char) source.read();
+        }
+        StringBuilder stringBuilder = new StringBuilder();
+        do {
+            stringBuilder.append(c);
+            c = (char) source.read();
+        } while (DELIMITERS.indexOf(c) < 0 && c != '>');
+        String result = stringBuilder.toString();
+
+        if (result.contains("/"))
+            state = CLOSE_TAG;
+        else
+            state = OPEN_TAG;
+        lastChat = c;
+        return new Token(TAG_NAME, result.replaceAll("/",""));
+    }
+
+    private Token tagAttrName(char c) throws IOException {
+        StringBuilder stringBuilder = new StringBuilder();
+        do {
+            stringBuilder.append(c);
+            c = (char) source.read();
+        } while (DELIMITERS.indexOf(c) < 0 && c != '=' && c != '>');
+
+        return new Token(ATTRIBUTE_NAME, stringBuilder.toString());
+    }
+
+    private Token tagAttrValue(char c) throws IOException {
+        while (DELIMITERS.indexOf(c) >= 0 || c == '"' || c == '=') {
+            c = (char) source.read();
         }
 
-        throw new IllegalArgumentException();
+        StringBuilder stringBuilder = new StringBuilder();
+        do {
+            stringBuilder.append(c);
+            c = (char) source.read();
+        } while (c != '"');
+
+        return new Token(ATTRIBUTE_VALUE, stringBuilder.toString());
     }
 
-
-
-
-    private String getLetterSequenceAsString(TokenType type) {
-        skipDelimiters();
-        StringBuilder builder = new StringBuilder();
-        char c = html.charAt(currentPosition);
-        if (type.equals(TAG_BODY)) {
-            while (c != '<' && maxPosition > currentPosition) {
-                builder.append(c);
-                c = html.charAt(++currentPosition);
-            }
-        } else if (type.equals(ATTRIBUTE_VALUE)) {
-            while (c != '"' && maxPosition > currentPosition) {
-                builder.append(c);
-                c = html.charAt(++currentPosition);
-            }
-        } else {
-            while (Character.isAlphabetic(c) && maxPosition > currentPosition) {
-                builder.append(c);
-                c = html.charAt(++currentPosition);
-            }
+    private Token tagBody(char c) throws IOException {
+        while (c == '>' || DELIMITERS.indexOf(c) >= 0) {
+            c = (char) source.read();
         }
 
-        return builder.toString();
+        if (c == '<') return tagName(c);
+
+        StringBuilder stringBuilder = new StringBuilder();
+        do {
+            stringBuilder.append(c);
+            c = (char) source.read();
+        } while (c != '<');
+
+        state = BODY;
+        return new Token(TAG_BODY, stringBuilder.toString());
     }
 
-    private void skipDelimiters() {
-        for (char delimiter : DELIMITERS) {
-            if (html.charAt(currentPosition) == delimiter && currentPosition < maxPosition) {
-                currentPosition++;
-                skipDelimiters();
-                break;
-            }
-        }
-    }
-
-
-
-
-    public void setState(TokenizerState state) {
-        this.state = state;
-    }
-
-    public TokenizerState getState() {
-        return state;
-    }
 }
