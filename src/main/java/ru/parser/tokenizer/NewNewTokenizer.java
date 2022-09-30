@@ -29,7 +29,10 @@ public class NewNewTokenizer {
         switch (state) {
             case OPEN_TAG, CLOSE_TAG -> {
                 if (c == '<') return tagName(c);
-                if (c == '>') return tagBody(c);
+                if (c == '>') {
+                    state = BODY;
+                    return getNextToken();
+                }
                 if (Character.isAlphabetic(c)) return tagAttrName(c);
                 if (c == '=' || c == '"') return tagAttrValue(c);
             }
@@ -93,7 +96,7 @@ public class NewNewTokenizer {
     }
 
     private Token tagBody(char c) throws IOException {
-        while (DELIMITERS.indexOf(c) >= 0) {
+        while (DELIMITERS.indexOf(c) >= 0 || c == '>') {
             c = (char) source.read();
         }
 
