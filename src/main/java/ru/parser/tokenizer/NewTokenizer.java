@@ -6,17 +6,16 @@ import java.io.InputStream;
 import static ru.parser.tokenizer.TokenType.*;
 import static ru.parser.tokenizer.TokenizerState.*;
 
-public class Tokenizer {
-
+public class NewTokenizer {
     private TokenizerState state;
     private final String DELIMITERS = "\t\n\r\f ";
     private final InputStream source;
 
-    private TokenType prevTokenType;
-    private char lastChat = ' ';
+    private State nextToHandle;
 
-    public Tokenizer(InputStream source) {
+    public NewTokenizer(InputStream source) {
         this.source = source;
+        nextToHandle = State.T_NAME;
     }
 
 
@@ -29,50 +28,53 @@ public class Tokenizer {
             c = (char) source.read();
         }
 
-        Token token = null;
-        if (c == '<' || prevTokenType == TAG_BODY) {
-            token = tagName((char) source.read());
-        } else if (lastChat == '>' || c == '>') {
-            token = tagBody(c);
-        } else if (Character.isAlphabetic(c) && (prevTokenType == TAG_NAME || prevTokenType == ATTRIBUTE_NAME || prevTokenType == ATTRIBUTE_VALUE)) {
-            token = tagAttrName(c);
-        } else if (c == '"' || c == '=') {
-            token = tagAttrValue(c);
-        } else {
-            throw new UnsupportedOperationException();
+        switch (nextToHandle) {
+            case T_NAME -> {
+                return tagName(c);
+            }
+            case T_ATTRS -> {
+                return tagAttrName(c);
+            }
+            case T_BODY -> {
+                return tagBody(c);
+            }
         }
 
-        prevTokenType = token.getType();
-        return token;
+        throw new UnsupportedOperationException();
     }
 
     private Token tagName(char c) throws IOException {
         while (DELIMITERS.indexOf(c) >= 0 || c == '<') {
             c = (char) source.read();
         }
+
         StringBuilder stringBuilder = new StringBuilder();
         do {
             stringBuilder.append(c);
             c = (char) source.read();
         } while (DELIMITERS.indexOf(c) < 0 && c != '>');
-        String result = stringBuilder.toString();
 
-        if (result.contains("/"))
-            state = CLOSE_TAG;
-        else
-            state = OPEN_TAG;
-        lastChat = c;
+        nextToHandle = c == '>' ? State.T_BODY : State.T_ATTRS;
+        String result = stringBuilder.toString();
+        state = result.contains("/") ? CLOSE_TAG : OPEN_TAG;
         return new Token(TAG_NAME, result.replaceAll("/",""));
     }
 
     private Token tagAttrName(char c) throws IOException {
-        StringBuilder stringBuilder = new StringBuilder();
+        while (DELIMITERS.indexOf(c) >= 0) {
+            c = (char) source.read();
+        }
+        if (c == '>') return tagBody(c);
+        if (c == '=' || c == '"') return tagAttrValue(c);
+
+        StringBuilder builder = new StringBuilder();
         do {
-            stringBuilder.append(c);
+            builder.append(c);
             c = (char) source.read();
         } while (DELIMITERS.indexOf(c) < 0 && c != '=' && c != '>');
 
-        return new Token(ATTRIBUTE_NAME, stringBuilder.toString());
+        if (c == '>') nextToHandle = State.T_BODY;
+        return new Token(ATTRIBUTE_NAME, builder.toString());
     }
 
     private Token tagAttrValue(char c) throws IOException {
@@ -90,20 +92,23 @@ public class Tokenizer {
     }
 
     private Token tagBody(char c) throws IOException {
-        while (c == '>' || DELIMITERS.indexOf(c) >= 0) {
+        while (DELIMITERS.indexOf(c) >= 0 || c == '>') {
             c = (char) source.read();
         }
-
         if (c == '<') return tagName(c);
-
-        StringBuilder stringBuilder = new StringBuilder();
+        StringBuilder builder = new StringBuilder();
         do {
-            stringBuilder.append(c);
+            builder.append(c);
             c = (char) source.read();
         } while (c != '<');
 
+        nextToHandle = State.T_NAME;
         state = BODY;
-        return new Token(TAG_BODY, stringBuilder.toString().trim());
+        return new Token(TAG_BODY, builder.toString().trim());
+    }
+
+    private enum State {
+        T_NAME, T_ATTRS, T_BODY
     }
 
 }
