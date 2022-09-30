@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import static ru.parser.tokenizer.TokenType.*;
+import static ru.parser.tokenizer.TokenType.COMMENT;
 import static ru.parser.tokenizer.TokenType.TAG_BODY;
 import static ru.parser.tokenizer.TokenizerState.*;
 
@@ -47,17 +48,39 @@ public class NewNewTokenizer {
                 state = OPEN_TAG;
                 return tagName(c);
             }
+            case COMMENT -> {
+                state = BODY;
+                return comment(c);
+            }
         }
 
         throw new IllegalArgumentException();
     }
 
+    private Token comment(char c) throws IOException {
+        while (DELIMITERS.indexOf(c) >= 0 || c == '-' || c == '<') {
+            c = (char) source.read();
+        }
+        StringBuilder stringBuilder = new StringBuilder();
+        do {
+            stringBuilder.append(c);
+            c = (char) source.read();
+        } while (DELIMITERS.indexOf(c) < 0 && c != '-');
 
+        while (c == '-' || c == '>') {
+            c = (char) source.read();
+        }
 
+        return new Token(COMMENT, stringBuilder.toString());
+    }
 
     private Token tagName(char c) throws IOException {
         while (DELIMITERS.indexOf(c) >= 0 || c == '<') {
             c = (char) source.read();
+        }
+        if (c == '!') {
+            state = TokenizerState.COMMENT;
+            return getNextToken();
         }
         StringBuilder stringBuilder = new StringBuilder();
         do {
@@ -66,7 +89,7 @@ public class NewNewTokenizer {
         } while (DELIMITERS.indexOf(c) < 0 && c != '>');
 
         if (c == '>') state = BODY;
-        return new Token(TAG_NAME, stringBuilder.toString().replaceAll("/",""));
+        return new Token(TAG_NAME, stringBuilder.toString().replaceAll("/", ""));
     }
 
     private Token tagAttrName(char c) throws IOException {
