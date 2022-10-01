@@ -75,10 +75,10 @@ public class NewNewTokenizer {
     }
 
     private Token tagName(char c) throws IOException {
-        while (DELIMITERS.indexOf(c) >= 0 || c == '<') {
+        while (DELIMITERS.indexOf(c) >= 0 || c == '<' || c == '!') {
             c = (char) source.read();
         }
-        if (c == '!') {
+        if (c == '-') {
             state = TokenizerState.COMMENT;
             return getNextToken();
         }
@@ -89,7 +89,7 @@ public class NewNewTokenizer {
         } while (DELIMITERS.indexOf(c) < 0 && c != '>');
 
         if (c == '>') state = BODY;
-        return new Token(TAG_NAME, stringBuilder.toString().replaceAll("/", ""));
+        return new Token(TAG_NAME, stringBuilder.toString());
     }
 
     private Token tagAttrName(char c) throws IOException {

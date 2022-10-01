@@ -19,6 +19,9 @@ public class Tag {
         this.body = new ArrayList<>();
     }
 
+    public void addBody(String body) {
+        this.body.add(body);
+    }
     public void addAttribute(String name, String value) {
         attributes.add(new Attribute(name, value));
     }
