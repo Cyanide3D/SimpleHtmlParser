@@ -2,6 +2,7 @@ package ru.parser.tokenizer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.function.Predicate;
 
 import static ru.parser.tokenizer.TokenType.*;
 import static ru.parser.tokenizer.TokenizerState.*;
@@ -12,11 +13,9 @@ public class Tokenizer {
     private final String DELIMITERS = "\t\n\r\f ";
     private final InputStream source;
 
-    private TokenType prevTokenType;
-    private char lastChat = ' ';
-
     public Tokenizer(InputStream source) {
         this.source = source;
+        this.state = OPEN_TAG;
     }
 
 
@@ -25,85 +24,106 @@ public class Tokenizer {
         if (bytes == -1) return null;
         char c = (char) bytes;
 
-        while (DELIMITERS.indexOf(c) >= 0) {
-            c = (char) source.read();
-        }
+        switch (state) {
+            case OPEN_TAG -> {
+                char character = match(c, ch -> ch == '<' || Character.isAlphabetic(ch) || ch == '"' || ch == '>' || ch == '/');
+                if (character == '/')
+                    return getTagNameToken(character);
+                if (character == '<')
+                    return getTagNameToken(character);
+                if (Character.isAlphabetic(character))
+                    return getAttrNameToken(character);
+                if (character == '"')
+                    return getAttrValueToken(character);
+                if (character == '>') {
+                    state = BODY;
+                    return getNextToken();
+                }
+            }
 
-        Token token = null;
-        if (c == '<' || prevTokenType == TAG_BODY) {
-            token = tagName((char) source.read());
-        } else if (lastChat == '>' || c == '>') {
-            token = tagBody(c);
-        } else if (Character.isAlphabetic(c) && (prevTokenType == TAG_NAME || prevTokenType == ATTRIBUTE_NAME || prevTokenType == ATTRIBUTE_VALUE)) {
-            token = tagAttrName(c);
-        } else if (c == '"' || c == '=') {
-            token = tagAttrValue(c);
-        } else {
-            throw new UnsupportedOperationException();
-        }
+            case BODY -> {
+                char character = match(c, ch -> ch == '<' || Character.isAlphabetic(ch));
+                if (Character.isAlphabetic(character))
+                    return getTagBodyToken(character);
+                if (character == '<')
+                    return getTagNameToken(character);
+            }
 
-        prevTokenType = token.getType();
-        return token;
+            case CLOSE_TAG -> {
+                char character = match(c, ch -> Character.isAlphabetic(ch) || ch == '/');
+                return getTagNameToken(character);
+            }
+        }
+        return null;
     }
 
-    private Token tagName(char c) throws IOException {
-        while (DELIMITERS.indexOf(c) >= 0 || c == '<') {
-            c = (char) source.read();
-        }
-        StringBuilder stringBuilder = new StringBuilder();
-        do {
-            stringBuilder.append(c);
-            c = (char) source.read();
-        } while (DELIMITERS.indexOf(c) < 0 && c != '>');
-        String result = stringBuilder.toString();
+    private Token getTagBodyToken(char c) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        writeInStringBuilderWhile(builder, skipDelimiters(c), ch -> ch != '<');
 
-        if (result.contains("/"))
-            state = CLOSE_TAG;
+        state = CLOSE_TAG;
+
+        return new Token(TAG_BODY, builder.toString().trim());
+    }
+
+    private Token getTagNameToken(char c) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        c = writeInStringBuilderWhile(builder, skipCharactersWhile(c, ch -> ch == '<'), ch -> ch != '>' && DELIMITERS.indexOf(ch) < 0);
+
+        if (c == '>')
+            state = BODY;
         else
             state = OPEN_TAG;
-        lastChat = c;
-        return new Token(TAG_NAME, result.replaceAll("/",""));
+
+        return new Token(TAG_NAME, builder.toString());
     }
 
-    private Token tagAttrName(char c) throws IOException {
-        StringBuilder stringBuilder = new StringBuilder();
-        do {
-            stringBuilder.append(c);
-            c = (char) source.read();
-        } while (DELIMITERS.indexOf(c) < 0 && c != '=' && c != '>');
+    private Token getAttrValueToken(char c) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        writeInStringBuilderWhile(builder, skipCharactersWhile(c, ch -> ch == '"'), ch -> ch != '"');
 
-        return new Token(ATTRIBUTE_NAME, stringBuilder.toString());
+        return new Token(ATTRIBUTE_VALUE, builder.toString());
     }
 
-    private Token tagAttrValue(char c) throws IOException {
-        while (DELIMITERS.indexOf(c) >= 0 || c == '"' || c == '=') {
+    private Token getAttrNameToken(char c) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        c = writeInStringBuilderWhile(builder, skipDelimiters(c), ch -> ch != '>' && DELIMITERS.indexOf(ch) < 0 && ch != '=');
+
+        if (c == '>')
+            state = BODY;
+
+        return new Token(ATTRIBUTE_NAME, builder.toString());
+    }
+
+
+    private char skipDelimiters(char c) throws IOException {
+        return skipCharactersWhile(c, ch -> false);
+    }
+
+    private char skipCharactersWhile(char c, Predicate<Character> predicate) throws IOException {
+        while (predicate.test(c) || DELIMITERS.indexOf(c) >= 0) {
             c = (char) source.read();
         }
-
-        StringBuilder stringBuilder = new StringBuilder();
-        do {
-            stringBuilder.append(c);
-            c = (char) source.read();
-        } while (c != '"');
-
-        return new Token(ATTRIBUTE_VALUE, stringBuilder.toString());
+        return c;
     }
 
-    private Token tagBody(char c) throws IOException {
-        while (c == '>' || DELIMITERS.indexOf(c) >= 0) {
+    private char writeInStringBuilderWhile(StringBuilder builder, char c, Predicate<Character> predicate) throws IOException {
+        do {
+            builder.append(c);
             c = (char) source.read();
+        } while (predicate.test(c));
+
+        return c;
+    }
+
+    private char match(char c, Predicate<Character> predicate) throws IOException {
+        char character = skipCharactersWhile(c, ch -> false);
+        if (predicate.test(character)) {
+            return character;
+        } else {
+            throw new RuntimeException("Unexpected character: " + character);
         }
-
-        if (c == '<') return tagName(c);
-
-        StringBuilder stringBuilder = new StringBuilder();
-        do {
-            stringBuilder.append(c);
-            c = (char) source.read();
-        } while (c != '<');
-
-        state = BODY;
-        return new Token(TAG_BODY, stringBuilder.toString().trim());
     }
+
 
 }
