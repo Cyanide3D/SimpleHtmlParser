@@ -3,7 +3,10 @@ package ru.parser;
 import org.w3c.dom.Attr;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Tag {
 
@@ -22,7 +25,25 @@ public class Tag {
     public void addBody(String body) {
         this.body.add(body);
     }
+//
+//    public String collectAsString() {
+//        StringBuilder builder = new StringBuilder();
+//        builder.append("<").append(name);
+//        for (Attribute attribute : attributes) {
+//            builder.append(" ").append(attribute.getName());
+//            if (attribute.getValue() != null) {
+//                builder.append("=\"").append(attribute.getValue()).append("\"");
+//            }
+//        }
+//        builder.append(">").append(String.join(" ", body));
+//        for (Tag child : children) {
+//            builder.append(child.collectAsString());
+//        }
+//        builder.append("</").append(name).append(">");
+//        return builder.toString();
+//    }
     public void addAttribute(String name, String value) {
+        attributes.removeIf(attribute -> attribute.getName().equals(name));
         attributes.add(new Attribute(name, value));
     }
 
