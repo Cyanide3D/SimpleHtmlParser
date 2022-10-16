@@ -57,6 +57,14 @@ public class Tokenizer {
         return null;
     }
 
+    private Token getCommentToken(char c) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        c = writeInStringBuilderWhile(builder, skipCharactersWhile(c, ch -> ch == '-'), ch -> ch != '>');
+
+        state = BODY;
+        return new Token(TokenType.COMMENT, builder.toString().substring(0, builder.length() - 3).trim());
+    }
+
     private Token getTagBodyToken(char c) throws IOException {
         StringBuilder builder = new StringBuilder();
         writeInStringBuilderWhile(builder, skipDelimiters(c), ch -> ch != '<');
@@ -68,7 +76,16 @@ public class Tokenizer {
 
     private Token getTagNameToken(char c) throws IOException {
         StringBuilder builder = new StringBuilder();
-        c = writeInStringBuilderWhile(builder, skipCharactersWhile(c, ch -> ch == '<'), ch -> ch != '>' && DELIMITERS.indexOf(ch) < 0);
+        c = skipCharactersWhile(c, ch -> ch == '<');
+        if (c == '!') {
+            c = (char) source.read();
+            if (c == '-')
+                return getCommentToken(c);
+            else
+                builder.append("!");
+        }
+
+        c = writeInStringBuilderWhile(builder, c, ch -> ch != '>' && DELIMITERS.indexOf(ch) < 0);
 
         if (c == '>')
             state = BODY;
