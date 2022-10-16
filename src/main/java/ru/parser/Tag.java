@@ -47,6 +47,10 @@ public class Tag {
         attributes.add(new Attribute(name, value));
     }
 
+    public Attribute getLastAttr() {
+        return attributes.get(attributes.size() - 1);
+    }
+
     public void addChild(Tag tag) {
         children.add(tag);
     }

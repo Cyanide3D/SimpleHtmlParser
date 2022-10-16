@@ -11,48 +11,45 @@ public class Parser {
 
     private Tokenizer tokenizer;
     private final Set<String> notCloseableTags = Set.of("br", "DOCTYPE", "meta", "img");
-    private final Stack<Token> cache = new Stack<>();
+    private final Stack<Tag> cache = new Stack<>();
 
 
     public Tag parse(InputStream source) throws IOException {
         tokenizer = new Tokenizer(source);
+        Tag tag = new Tag();
+        tag.setName("");
+        cache.push(tag);
+        constructTree(tokenizer.getNextToken());
 
-        Tag root = new Tag();
-        constructTree(root, tokenizer.getNextToken());
-
-        return root;
+        return tag.getChildren().get(0);
     }
 
 
 
-    private void constructTree(Tag tag, Token token) throws IOException {
+    private void constructTree(Token token) throws IOException {
         do {
             switch (token.getType()) {
-                case ATTRIBUTE_NAME -> {
-                    String name = token.getValue();
-                    cache.push(token);
-                    tag.addAttribute(name, null);
+                case TAG_NAME -> {
+                    if (token.getValue().contains("/")) {
+                        cache.pop();
+                        continue;
+                    }
+                    if (isNonCloseableTag(cache.peek().getName()))
+                        cache.pop();
+
+                    Tag tag = new Tag();
+                    cache.peek().addChild(tag);
+                    tag.setName(token.getValue());
+                    cache.push(tag);
                 }
                 case ATTRIBUTE_VALUE -> {
-                    tag.addAttribute(cache.pop().getValue(), token.getValue());
+                    cache.peek().getLastAttr().setValue(token.getValue());
                 }
-                case TAG_NAME -> {
-                    if (token.getValue().contains("/"))
-                        return;
-                    if (tag.getName() == null) {
-                        tag.setName(token.getValue());
-                    } else {
-                        Tag child = new Tag();
-                        child.setParent(tag);
-                        tag.addChild(child);
-                        child.setName(token.getValue());
-                        if (!isNonCloseableTag(token.getValue())) {
-                            constructTree(child, tokenizer.getNextToken());
-                        }
-                    }
+                case ATTRIBUTE_NAME -> {
+                    cache.peek().addAttribute(token.getValue(), null);
                 }
                 case TAG_BODY -> {
-                    tag.addBody(token.getValue());
+                    cache.peek().addBody(token.getValue());
                 }
             }
         } while ((token = tokenizer.getNextToken()) != null);
