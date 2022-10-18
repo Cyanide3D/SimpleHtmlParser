@@ -1,27 +1,29 @@
 package ru.parser;
 
+import ru.parser.tokenizer.LexemeAnalyzerImpl;
 import ru.parser.tokenizer.Token;
-import ru.parser.tokenizer.Tokenizer;
+import ru.parser.tokenizer.TokenizerImpl;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+import static ru.parser.Tag.notCloseableTags;
+
 public class Parser {
 
-    private Tokenizer tokenizer;
-    private final Set<String> notCloseableTags = Set.of("br", "DOCTYPE", "meta", "img");
+    private TokenizerImpl tokenizer;
     private final Stack<Tag> cache = new Stack<>();
 
 
     public Tag parse(InputStream source) throws IOException {
-        tokenizer = new Tokenizer(source);
+        tokenizer = new TokenizerImpl(new LexemeAnalyzerImpl(source));
         Tag tag = new Tag();
         tag.setName("");
         cache.push(tag);
         constructTree(tokenizer.getNextToken());
 
-        return tag.getChildren().get(0);
+        return tag;
     }
 
 
@@ -30,10 +32,6 @@ public class Parser {
         do {
             switch (token.getType()) {
                 case TAG_NAME -> {
-                    if (token.getValue().contains("/")) {
-                        cache.pop();
-                        continue;
-                    }
                     if (isNonCloseableTag(cache.peek().getName()))
                         cache.pop();
 
@@ -41,6 +39,13 @@ public class Parser {
                     cache.peek().addChild(tag);
                     tag.setName(token.getValue());
                     cache.push(tag);
+                }
+                case CLOSE -> {
+                    if (!token.getValue().equals("/") && !isNonCloseableTag(token.getValue())) {
+                        while (isNonCloseableTag(cache.peek().getName()))
+                            cache.pop();
+                        cache.pop();
+                    }
                 }
                 case ATTRIBUTE_VALUE -> {
                     cache.peek().getLastAttr().setValue(token.getValue());

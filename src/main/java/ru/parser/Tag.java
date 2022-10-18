@@ -2,14 +2,12 @@ package ru.parser;
 
 import org.w3c.dom.Attr;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Tag {
 
+    public static final Set<String> notCloseableTags = Set.of("br", "DOCTYPE", "meta", "img", "link");
     private String name;
     private List<Attribute> attributes;
     private List<Tag> children;
@@ -52,6 +50,7 @@ public class Tag {
     }
 
     public void addChild(Tag tag) {
+        tag.parent = this;
         children.add(tag);
     }
 
