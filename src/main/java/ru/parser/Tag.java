@@ -1,17 +1,24 @@
 package ru.parser;
 
-import org.w3c.dom.Attr;
-
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 public class Tag {
 
-    public static final Set<String> notCloseableTags = Set.of("br", "DOCTYPE", "meta", "img", "link");
+    public static final Set<String> VOID_TAGS = Set.of(
+            "area","base","br","col","embed","hr","img","input",
+            "link","meta","param","source","track","wbr"
+    );
+
     private String name;
-    private List<Attribute> attributes;
-    private List<Tag> children;
-    private List<String> body;
+
+    private final List<Attribute> attributes;
+
+    private final List<Tag> children;
+
+    private final List<String> body;
+
     private Tag parent;
 
     public Tag() {
@@ -23,7 +30,7 @@ public class Tag {
     public void addBody(String body) {
         this.body.add(body);
     }
-//
+//    TODO по окончанию всех работ доделать
 //    public String collectAsString() {
 //        StringBuilder builder = new StringBuilder();
 //        builder.append("<").append(name);
@@ -54,6 +61,14 @@ public class Tag {
         children.add(tag);
     }
 
+    public String getAttributeValue(String name) {
+        for (Attribute attribute : attributes) {
+            if (attribute.getName().equals(name))
+                return attribute.getValue();
+        }
+        return null;
+    }
+
     public String getName() {
         return name;
     }
@@ -66,24 +81,12 @@ public class Tag {
         return attributes;
     }
 
-    public void setAttributes(List<Attribute> attributes) {
-        this.attributes = attributes;
-    }
-
     public List<Tag> getChildren() {
         return children;
     }
 
-    public void setChildren(List<Tag> children) {
-        this.children = children;
-    }
-
     public List<String> getBody() {
         return body;
-    }
-
-    public void setBody(List<String> body) {
-        this.body = body;
     }
 
     public Tag getParent() {

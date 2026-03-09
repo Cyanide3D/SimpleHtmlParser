@@ -2,6 +2,22 @@ package ru.parser.tokenizer;
 
 public enum TokenizerState {
 
-    OPEN_TAG, BODY, CLOSE_TAG, COMMENT
+    DATA,
+
+    TAG_OPEN,
+
+            TAG_NAME,
+
+    BEFORE_ATTR_NAME,
+
+            ATTR_NAME,
+
+    BEFORE_ATTR_VALUE,
+
+            ATTR_VALUE_QUOTED,
+
+    ATTR_VALUE_UNQUOTED,
+
+            COMMENT
 
 }

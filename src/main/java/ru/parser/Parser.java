@@ -1,73 +1,100 @@
 package ru.parser;
 
 import ru.parser.tokenizer.LexemeAnalyzerImpl;
-import ru.parser.tokenizer.Token;
+import ru.parser.tokenizer.Tokenizer;
 import ru.parser.tokenizer.TokenizerImpl;
+import ru.parser.tokenizer.token.CommentToken;
+import ru.parser.tokenizer.token.DoctypeToken;
+import ru.parser.tokenizer.token.EndTagToken;
+import ru.parser.tokenizer.token.HtmlToken;
+import ru.parser.tokenizer.token.StartTagToken;
+import ru.parser.tokenizer.token.TextToken;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
-
-import static ru.parser.Tag.notCloseableTags;
+import java.util.Map;
+import java.util.Stack;
 
 public class Parser {
 
-    private TokenizerImpl tokenizer;
     private final Stack<Tag> cache = new Stack<>();
 
-
-    public Tag parse(InputStream source) throws IOException {
-        tokenizer = new TokenizerImpl(new LexemeAnalyzerImpl(source));
+    public Tag parse(InputStream is) throws IOException {
         Tag tag = new Tag();
         tag.setName("");
+        cache.clear();
         cache.push(tag);
-        constructTree(tokenizer.getNextToken());
-
+        buildTree(new TokenizerImpl(new LexemeAnalyzerImpl(is)));
         return tag;
     }
 
+    private void buildTree(Tokenizer tokenizer) throws IOException {
+        HtmlToken token;
 
-
-    private void constructTree(Token token) throws IOException {
-        do {
-            switch (token.getType()) {
-                case TAG_NAME -> {
-                    if (isNonCloseableTag(cache.peek().getName()))
-                        cache.pop();
-
+        while ((token = tokenizer.getNextToken()) != null) {
+            switch (token.tokenName()) {
+                case StartTagToken.NAME -> {
+                    StartTagToken startTagToken = (StartTagToken) token;
                     Tag tag = new Tag();
-                    cache.peek().addChild(tag);
-                    tag.setName(token.getValue());
-                    cache.push(tag);
-                }
-                case CLOSE -> {
-                    if (!token.getValue().equals("/") && !isNonCloseableTag(token.getValue())) {
-                        while (isNonCloseableTag(cache.peek().getName()))
-                            cache.pop();
-                        cache.pop();
+                    tag.setName(startTagToken.name());
+
+                    Map<String, String> attrs = startTagToken.attrs();
+                    for (Map.Entry<String, String> attr : attrs.entrySet()) {
+                        tag.addAttribute(attr.getKey(), attr.getValue());
+                    }
+
+                    Tag lastTag = cache.peek();
+                    lastTag.addChild(tag);
+                    tag.setParent(lastTag);
+
+                    if (!startTagToken.selfClosing()) {
+                        cache.push(tag);
                     }
                 }
-                case ATTRIBUTE_VALUE -> {
-                    cache.peek().getLastAttr().setValue(token.getValue());
+                case EndTagToken.NAME -> {
+                    EndTagToken endTagToken = (EndTagToken) token;
+                    String name = endTagToken.name();
+                    if (cache.size() == 1) {
+                        throw new RuntimeException("Unexpected closing tag: " + name);
+                    }
+                    Tag lastTag = cache.peek();
+                    if (!lastTag.getName().equals(name)) {
+                        throw new RuntimeException(
+                                "End tag name mismatch: expected </" + lastTag.getName() + "> but got </" + name + ">"
+                        );
+                    }
+                    cache.pop();
                 }
-                case ATTRIBUTE_NAME -> {
-                    cache.peek().addAttribute(token.getValue(), null);
+                case TextToken.NAME -> {
+                    TextToken textToken = (TextToken) token;
+                    Tag lastTag = cache.peek();
+                    lastTag.addBody(textToken.text());
                 }
-                case TAG_BODY -> {
-                    cache.peek().addBody(token.getValue());
+                case DoctypeToken.NAME -> {
+                    DoctypeToken doctypeToken = (DoctypeToken) token;
+                    Tag tag = new Tag();
+                    tag.setName("doctype");
+                    tag.addAttribute("rawValue", doctypeToken.rawValue());
+                    Tag lastTag = cache.peek();
+                    lastTag.addChild(tag);
+                    tag.setParent(lastTag);
                 }
-            }
-        } while ((token = tokenizer.getNextToken()) != null);
-    }
-
-    private boolean isNonCloseableTag(String name) {
-        for (String tag : notCloseableTags) {
-            if (name.toLowerCase().contains(tag.toLowerCase())) {
-                return true;
+                case CommentToken.NAME -> {
+                    CommentToken commentToken = (CommentToken) token;
+                    Tag tag = new Tag();
+                    tag.setName("comment");
+                    tag.addBody(commentToken.text());
+                    Tag lastTag = cache.peek();
+                    lastTag.addChild(tag);
+                    tag.setParent(lastTag);
+                }
+                default -> throw new IllegalStateException("Unexpected token: " + token.tokenName());
             }
         }
 
-        return false;
+        if (cache.size() != 1) {
+            throw new RuntimeException("Unclosed tags remain");
+        }
     }
 
 }

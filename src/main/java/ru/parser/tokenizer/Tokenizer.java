@@ -1,9 +1,11 @@
 package ru.parser.tokenizer;
 
+import ru.parser.tokenizer.token.HtmlToken;
+
 import java.io.IOException;
 
 public interface Tokenizer {
 
-    Token getNextToken() throws IOException;
+    HtmlToken getNextToken() throws IOException;
 
 }
